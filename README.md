@@ -8,7 +8,14 @@
 > 因此本项目增加了一个 **PC 端认证网关**，让手机通过局域网安全地访问 DSH 的 `/api`。
 > Android 端直接实现 DSH 官方 wire 协议（四象限 RPC + 双 WebSocket 下行流），与网页端使用完全相同的契约。
 
-## 仓库结构
+## 📑目录
+
+- [📦仓库结构](#-仓库结构)
+- [🚀快速开始](#-快速开始)
+  - [1. 🖥️电脑端 —— 一条命令启动全部](#1-电脑端----一条命令启动全部)
+  - [2. 📱手机端](#2-手机端)
+
+## 📦仓库结构
 
 ```
 ├── android/                  # Android 客户端（Kotlin + Jetpack Compose + Material 3）
@@ -26,9 +33,9 @@
 └── reference/                # （可选）官方仓库源码参考
 ```
 
-## 快速开始
+## 🚀快速开始
 
-### 1. 电脑端 —— 一条命令启动全部
+### 1. 🖥️电脑端 —— 一条命令启动全部
 
 ```bash
 # 首次：安装网关依赖
@@ -49,7 +56,7 @@ npm install
 
 防火墙放行 8742 端口；手机与电脑处于同一局域网。
 
-### 2. 手机端
+### 2. 📱手机端
 
 用 **Android Studio**（Ladybug 或更新版本）打开 `android/` 目录同步并运行；
 或命令行构建（wrapper 已入库，Windows 可直接 `gradlew.bat`；本机未装 Gradle 时可用
@@ -76,7 +83,7 @@ gradlew.bat :app:assembleDebug        # PowerShell 下为 .\gradlew.bat
 连接成功后即可：点右上角 🔍 **自动扫描局域网**发现电脑网关（自动填入 IP）→ 查看电脑上的全部会话 → 新建会话 → **输入任务发布到电脑运行** →
 实时看到回复流式输出、工具调用卡片、任务清单、每轮 token 增量，顶部可展开 Token 详细统计。
 
-## 功能清单（v0.2.5-beta）
+## ✨功能清单（v0.2.5-beta）
 
 | 能力 | 说明 | 协议 |
 |---|---|---|
@@ -95,14 +102,14 @@ gradlew.bat :app:assembleDebug        # PowerShell 下为 .\gradlew.bat
 | **手机传文件到电脑** | 聊天页 📎 选任意文件 → 流式上传（进度条）到**会话工作区 `uploads/`**，自动填入引用文案 | 网关 `PUT /upload` |
 | 聊天流畅度 | 流式阶段纯文本渲染（定稿后一次性渲染 Markdown）、80ms 采样折叠、列表 contentType 复用、发送加载态 | — |
 
-## 文档
+## 📚文档
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 架构、安全模型、为什么需要网关
 - [docs/PROTOCOL.md](docs/PROTOCOL.md) — DSH `/api` 协议完整参考（本项目实现的依据）
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 后续开发计划（后台保活通知、workspace 管理、成本统计、TLS 等）
 - [gateway/README.md](gateway/README.md) — 网关配置与部署
 
-## 参考来源
+## 📇参考来源
 
 - 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
 - 官方文档：仓库内 `docs/`、各包 `README.md`（`dsh-host-webserver`、`dsh-client-connection`、`dsh-token-meter`、`dsh-host-apiproxy` 等）
@@ -113,3 +120,9 @@ gradlew.bat :app:assembleDebug        # PowerShell 下为 .\gradlew.bat
 ## License
 
 MIT
+
+---
+
+## 📝关于
+
+该软件目前开发中
