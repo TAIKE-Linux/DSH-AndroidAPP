@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Night variant: light status-bar icons on the dark surface. The running
+         Activity switches to enableEdgeToEdge() auto styling at runtime; this
+         only covers the pre-Compose window. -->
+    <style name="Theme.DshAndroid" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#121318</item>
+    </style>
+</resources>

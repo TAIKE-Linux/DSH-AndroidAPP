@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chat bubble with three dots: remote task control. Kept inside the
+     adaptive-icon safe zone (center 66/108). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,40 h36 a5,5 0 0 1 5,5 v12 a5,5 0 0 1 -5,5 h-24 l-7,7 v-7 h-5 a5,5 0 0 1 -5,-5 v-12 a5,5 0 0 1 5,-5 z" />
+    <path
+        android:fillColor="#4D6BFE"
+        android:pathData="M41,52 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 z" />
+    <path
+        android:fillColor="#4D6BFE"
+        android:pathData="M51,52 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 z" />
+    <path
+        android:fillColor="#4D6BFE"
+        android:pathData="M61,52 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 z" />
+</vector>
