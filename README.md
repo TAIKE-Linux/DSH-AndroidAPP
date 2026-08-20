@@ -20,9 +20,9 @@
 
 </div>
 
-[![Telegram](https://img.shields.io/badge/Telegram-加入群组-2CA5E0?style=flat&logo=telegram&logoColor=white)](https://t.me/你的群组名)
-[![Discord](https://img.shields.io/badge/Discord-加入服务器-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/你的邀请码)
-[![QQ群](https://img.shields.io/badge/QQ群-114513-12B7F5?style=flat&logo=tencentqq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=你的邀请码)
+  [![Telegram](https://img.shields.io/badge/Telegram-加入群组-2CA5E0?style=flat&logo=telegram&logoColor=white)](https://t.me/你的群组名)
+  [![Discord](https://img.shields.io/badge/Discord-加入服务器-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/你的邀请码)
+  [![QQ群](https://img.shields.io/badge/QQ群-114513-12B7F5?style=flat&logo=tencentqq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=你的邀请码)
 
 ---
 
