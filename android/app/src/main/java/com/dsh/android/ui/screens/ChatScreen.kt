@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -51,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -149,6 +151,7 @@ fun ChatScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -283,7 +286,7 @@ fun ChatScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     // Context is transferred lightly: only the latest turn is
                     // loaded by default; older pages stream in on demand.
@@ -410,49 +413,58 @@ fun ChatScreen(
                     }
                 }
 
-                TokenBar(
-                    usage = ui.tokenUsage,
-                    pressure = ui.contextPressure,
-                    onOpenDetails = { showTokenSheet = true },
-                )
+                // Bottom dock (token meter + composer) centered like dsh web,
+                // max-width on tablets, full width on phones.
+                Box(
+                    Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+                        TokenBar(
+                            usage = ui.tokenUsage,
+                            pressure = ui.contextPressure,
+                            onOpenDetails = { showTokenSheet = true },
+                        )
 
-                // Composer: a single rounded field with attach + send inside.
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    placeholder = { Text("向电脑上的 Harness 发布任务…") },
-                    leadingIcon = {
-                        IconButton(
-                            onClick = { filePicker.launch("*/*") },
-                            enabled = ui.upload?.active != true,
-                        ) {
-                            Icon(painterResource(R.drawable.ic_attach_file), contentDescription = "上传文件到电脑")
-                        }
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { send() },
-                            enabled = input.isNotBlank() && !ui.sending,
-                        ) {
-                            if (ui.sending) {
-                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "发送",
-                                    tint = if (input.isNotBlank()) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                    minLines = 1,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { send() }),
-                )
+                        // Composer: a single rounded field with attach + send inside.
+                        OutlinedTextField(
+                            value = input,
+                            onValueChange = { input = it },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            placeholder = { Text("向电脑上的 Harness 发布任务…") },
+                            leadingIcon = {
+                                IconButton(
+                                    onClick = { filePicker.launch("*/*") },
+                                    enabled = ui.upload?.active != true,
+                                ) {
+                                    Icon(painterResource(R.drawable.ic_attach_file), contentDescription = "上传文件到电脑")
+                                }
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { send() },
+                                    enabled = input.isNotBlank() && !ui.sending,
+                                ) {
+                                    if (ui.sending) {
+                                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "发送",
+                                            tint = if (input.isNotBlank()) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            },
+                            minLines = 1,
+                            maxLines = 5,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { send() }),
+                        )
+                    }
+                }
             }
         }
     }

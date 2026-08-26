@@ -2,14 +2,19 @@
 
 给 DeepSeek Harness Android 客户端用的 PC 端认证网关。
 把只监听 `127.0.0.1:3080` 的 `dsh web` 的 `/api`（JSON-RPC + 双 WebSocket 事件流）
-以 **Bearer token 认证** 暴露到局域网。
+以 **Bearer token 认证 + 默认 HTTPS** 暴露到局域网或远程。
+
+本包有两种运行方式（二选一）：
+
+1. **独立进程**：`npm start` / `node src/index.js` / 双击 `start.bat`；
+2. **DSH bundle 插件**：`dsh plugin add <本目录>`，随 `dsh web` 一起启动，无需单独进程。
 
 ## 为什么存在
 
 `dsh web --host 0.0.0.0` 被官方 CLI 硬性拒绝（`/api` 等于远程代码执行且无认证层）。
 本网关不改动 DSH 任何配置，只是官方所说的「部署方认证层」。
 
-## 运行
+## 运行（独立进程）
 
 **一条命令搞定**：双击 `start.bat`（或 `npm start` / `node src/index.js`）。
 网关启动时会自动探测 DeepSeek Harness：**没在跑就替你启动 `dsh web`，等它就绪；**
@@ -17,7 +22,14 @@
 
 ```bash
 npm install          # 首次
-node src/index.js    # 读取 ./gateway.config.json（首次自动生成 token）
+node src/index.js    # 读取 ./gateway.config.json（首次自动生成 token + HTTPS 证书）
+```
+
+Token 管理：
+
+```bash
+npm run print-token    # 打印当前 token（也可直接读 gateway.token）
+npm run rotate-token   # 重新生成随机 token（旧 token 立即失效）
 ```
 
 > 需要单独控制 DSH 时：`gateway.config.json` 里设 `"launchDsh": false`（或用
@@ -35,7 +47,7 @@ node src/index.js    # 读取 ./gateway.config.json（首次自动生成 token�
 ```jsonc
 {
   "host": "0.0.0.0",                  // 局域网监听地址
-  "port": 8742,                       // 手机填 http://<电脑IP>:8742
+  "port": 8742,                       // 手机填 https://<电脑IP>:8742
   "upstream": "http://127.0.0.1:3080",// DSH 地址（保持 loopback）
   "token": "自动生成或手填",           // 手机端凭据；按密码对待
   "launchDsh": true,                  // true=网关自动拉起/重启 dsh web（一条命令模式）
@@ -43,9 +55,82 @@ node src/index.js    # 读取 ./gateway.config.json（首次自动生成 token�
   "dshCwd": "",                       // DSH 工作目录；空=仓库根目录
   "uploadDir": "",                    // 上传目录；空=会话工作区 uploads/
   "uploadLimitMB": 512,               // 上传大小上限
-  "tls": { "cert": "", "key": "" }    // 可选 HTTPS（mkcert/openssl 生成 PEM 路径）
+  "publicBaseUrl": "",                // 远程访问时对外公布的完整地址（如 https://x.example.com:8742）
+  "tls": {                            // HTTPS
+    "auto": true,                     // true=自动生成自签名证书（无需 openssl）
+    "cert": "",                       // 或指定已有证书 PEM 路径
+    "key": "",                        // 或指定已有私钥 PEM 路径
+    "certDir": "certs"                // 自动生成证书的存放目录
+  }
 }
 ```
+
+## 作为 DSH 插件导入（免独立进程）
+
+```bash
+dsh plugin add <gateway 目录绝对路径>
+```
+
+导入后 `dsh web` 会同时启动网关（默认 `0.0.0.0:8742`，HTTPS 自签名自动生成）。
+插件配置走 cordis 的 `config` 块，字段与上面 `gateway.config.json` 一致；
+Token 存于 `~/.dsh/remote-gateway/gateway.token`，证书存于
+`~/.dsh/remote-gateway/certs/`。插件模式**不会**再启动/重启 `dsh web`（它就在
+DSH 进程内），`launchDsh` 仅独立进程模式生效。
+
+### Token 重启轮换（默认开启，安全增强）
+
+插件模式下，**每次重启 `dsh web` 都会自动生成一个全新的随机 Token**——
+电脑重启后旧 Token 立即作废，手机需用面板新二维码重新扫码（公网隧道地址
+本来也会随重启变化，二者天然配套）。
+
+- 手动固定 Token：配置 `"token": "<固定值>"`（或环境变量 `DSH_GATEWAY_TOKEN`），
+  显式 Token 永不轮换；
+- 需要「重启后保持原 Token」时：配置 `"token": { "rotateOnRestart": false }`
+  （或环境变量 `DSH_GATEWAY_TOKEN_ROTATE=0`）；
+- 面板 Token 行会显示紫色提示「Token 随 dsh web 重启自动轮换」。
+
+## HTTPS 自签名
+
+`tls.auto: true`（推荐）时网关首次启动自动生成 2048-bit RSA 自签名证书，
+监听 HTTPS；手机端添加服务器时对 `https://` 地址开启「信任自签名证书」即可。
+证书 SHA-256 指纹通过未鉴权的 `GET /ident` 的 `tlsFingerprint` 字段公开，便于核对。
+
+> 自签名证书只加密传输、不证明对端身份；**认证仍由 bearer token 承担**。
+> 公网暴露请配合 Tailscale/VPN 或换成真实 CA 证书（`tls.cert`/`tls.key`）。
+
+## UI 面板与扫码配对（插件模式）
+
+作为 DSH 插件导入后，`dsh web` 的 **设置 → 远程网关** 会出现一个面板：
+
+- 显示网关地址（HTTPS + 局域网 IP，`publicBaseUrl` 配置时优先显示公网地址）；
+- 显示完整 Token（可复制）；
+- 生成 **二维码**：用手机相机/微信扫码即可直接打开 DSH Android 并自动连接；
+- 提供「复制连接串」备用（`dsh-gateway://connect?u=…&t=…`）。
+
+手机端在「DSH 服务器」页点 **扫码**，用系统相机对准二维码即可；也可粘贴连接串手动连接。
+
+## 远程访问（内网穿透，一键开启）
+
+插件内置 **Cloudflare Quick Tunnel**（`cloudflared`），**无需账号、无需公网服务器、
+无需端口转发**，一条命令都不用手打：
+
+1. 打开 `dsh web` → **设置 → 远程网关** → 点「**开启内网穿透**」；
+2. 首次会自动下载 `cloudflared`（约 55MB，存于 `~/.dsh/remote-gateway/`；
+   网络受限的机器也可手动下载后把路径写进插件配置 `tunnel.binary`）；
+3. 约 10–30 秒后出现公网地址 `https://xxx.trycloudflare.com`，面板二维码
+   **自动切换为公网地址**——手机在任何网络（含蜂窝流量）扫码即可直连；
+4. 点「关闭」随时停止。`/ident` 会实时公布该公网地址，局域网扫描结果也会显示。
+
+实现与安全要点：
+
+- 隧道通过 loopback 连接网关本地 HTTPS 端口（校验关闭，仅本机一跳）；
+  公网侧是 Cloudflare 的真实 CA 证书，手机**无需**「信任自签名证书」；
+- 认证不变：所有请求仍必须携带 `Authorization: Bearer <token>`；
+- Quick Tunnel 无 SLA（随机域名、随隧道进程变化），长期使用建议自建
+  frp/Tailscale 或 Cloudflare 命名隧道，并用 `publicBaseUrl` 固定地址；
+- 可配置 `"tunnel": { "enabled": true }` 让插件启动即开启（或环境变量
+  `DSH_GATEWAY_TUNNEL=1`）；`POST /dsh-remote-gateway/tunnel` `{enable:true|false}`
+  是面板使用的运行时开关。
 
 ## 一条命令模式（DSH 托管）
 
@@ -58,7 +143,7 @@ node src/index.js    # 读取 ./gateway.config.json（首次自动生成 token�
 
 | 路径 | 方法 | 鉴权 | 说明 |
 |---|---|---|---|
-| `/ident` | GET | 否 | **扫描识别端点**：静态最小 JSON `{gateway:{name,version},scheme}`，供手机局域网扫描发现（零敏感信息） |
+| `/ident` | GET | 否 | **扫描识别端点**：`{gateway:{name,version},scheme,tlsFingerprint?,public?}`，供手机扫描发现（零敏感信息） |
 | `/health` | GET | 否 | 网关信息 + 上游可达性布尔值（不含 cwd/模型等主机细节，v0.2 安全收紧） |
 | `/api/<method>` | POST | 是 | 代理 DSH 一元 RPC（`client-request` 信封原样转发） |
 | `/api/respond` | POST | 是 | 代理应答帧（审批/提问） |

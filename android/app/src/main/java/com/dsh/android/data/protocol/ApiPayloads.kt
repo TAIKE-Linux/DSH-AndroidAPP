@@ -175,6 +175,14 @@ object Api {
 
     fun hostDescribe(): JsonElement = empty()
 
+    /** Archive (remove from the list) one conversation — official RPC. */
+    fun workspaceArchiveSession(sessionId: String): JsonElement = buildJsonObject {
+        put("sessionId", sessionId)
+    }
+
+    /** Workspace catalog incl. the archive set (seeds the hidden-session filter). */
+    fun workspaceList(): JsonElement = empty()
+
     /** Approval answer value (POST /api/respond with a client-response echoing the frame rpcId). */
     fun approvalAnswer(sessionId: String, approvalId: String, allowed: Boolean): JsonElement = buildJsonObject {
         put("sessionId", sessionId)

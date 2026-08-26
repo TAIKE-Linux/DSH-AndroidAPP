@@ -14,8 +14,8 @@ android {
         applicationId = "com.dsh.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.5-beta"
+        versionCode = 5
+        versionName = "0.3.0-beta"
     }
 
     buildTypes {
@@ -72,5 +72,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.zxing.embedded)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

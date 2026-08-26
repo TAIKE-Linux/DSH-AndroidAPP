@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "tsdown": "^0.22.14",
+    "typescript": "^5.9.3"
+  }
+}

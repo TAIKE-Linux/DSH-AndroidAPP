@@ -1,5 +1,7 @@
 package com.dsh.android.ui.screens
 
+import android.content.ClipboardManager
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,31 +47,45 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.dsh.android.DshApp
 import com.dsh.android.data.remote.ConnectionState
 import com.dsh.android.data.store.ServerConfig
+import com.dsh.android.ui.components.BackgroundDialog
 import com.dsh.android.ui.viewmodel.ServersViewModel
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServerListScreen(
     onOpenSessions: () -> Unit,
+    onOpenChat: (String) -> Unit,
     viewModel: ServersViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scan by viewModel.scanState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val backgroundStore = (context.applicationContext as DshApp).container.backgroundStore
+    val background by backgroundStore.current.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
     var prefillUrl by remember { mutableStateOf<String?>(null) }
     var showScanDialog by remember { mutableStateOf(false) }
+    var showQrConnectDialog by remember { mutableStateOf(false) }
+    var showBackgroundDialog by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<ServerConfig?>(null) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("DSH 服务器") },
                 actions = {
+                    TextButton(onClick = { showQrConnectDialog = true }) { Text("扫码") }
+                    TextButton(onClick = { showBackgroundDialog = true }) { Text("背景") }
                     IconButton(onClick = {
                         viewModel.startScan()
                         showScanDialog = true
@@ -100,7 +116,7 @@ fun ServerListScreen(
                         isActive = isActive,
                         connectionState = if (isActive) state.connectionState else null,
                         busy = false,
-                        onConnect = { viewModel.connect(server) },
+                        onConnect = { viewModel.connectAndOpen(server, onOpenChat) },
                         onOpen = onOpenSessions,
                         onDelete = { pendingDelete = server },
                     )
@@ -119,11 +135,19 @@ fun ServerListScreen(
                 // one tap; otherwise prefill the add dialog for the token.
                 val saved = state.servers.firstOrNull { it.baseUrl.trimEnd('/') == result.baseUrl }
                 if (saved != null) {
-                    viewModel.connect(saved)
+                    viewModel.connectAndOpen(saved, onOpenChat)
                 } else {
                     prefillUrl = result.baseUrl
                     showAddDialog = true
                 }
+            },
+            onPickPublic = { publicUrl ->
+                // Gateway advertises a WAN URL (e.g. NAT-traversal tunnel):
+                // prefill the add dialog with it so the user can connect from
+                // any network after entering the token.
+                showScanDialog = false
+                prefillUrl = publicUrl
+                showAddDialog = true
             },
             onCancel = {
                 viewModel.cancelScan()
@@ -142,10 +166,27 @@ fun ServerListScreen(
                 showAddDialog = false
                 prefillUrl = null
             },
-            onSave = { name, url, token, allowAnswers ->
-                viewModel.saveServer(name, url, token, allowAnswers)
+            onSave = { name, url, token, allowAnswers, allowSelfSigned ->
+                viewModel.saveServer(name, url, token, allowAnswers, allowSelfSigned, onOpenChat)
                 showAddDialog = false
                 prefillUrl = null
+            },
+        )
+    }
+
+    if (showBackgroundDialog) {
+        BackgroundDialog(
+            current = background,
+            onDismiss = { showBackgroundDialog = false },
+            onSelect = { backgroundStore.set(it) },
+        )
+    }
+
+    if (showQrConnectDialog) {
+        QrConnectDialog(
+            onDismiss = { showQrConnectDialog = false },
+            onConnect = { uri ->
+                if (viewModel.connectDeepLink(uri, onOpenChat)) true else false
             },
         )
     }
@@ -262,6 +303,7 @@ private fun ScanDialog(
     scan: com.dsh.android.data.remote.LanScanState,
     savedServers: List<ServerConfig>,
     onPick: (com.dsh.android.data.remote.LanScanResult) -> Unit,
+    onPickPublic: (String) -> Unit,
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -313,11 +355,21 @@ private fun ScanDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (result.publicUrl != null) {
+                                    Text(
+                                        "远程访问：${result.publicUrl}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                             if (saved != null) {
                                 TextButton(onClick = { onPick(result) }) { Text("连接") }
                             } else {
                                 TextButton(onClick = { onPick(result) }) { Text("使用") }
+                            }
+                            if (result.publicUrl != null) {
+                                TextButton(onClick = { onPickPublic(result.publicUrl) }) { Text("远程") }
                             }
                         }
                     }
@@ -342,15 +394,104 @@ private fun normalizeUrlInput(input: String): String {
 }
 
 @Composable
+private fun QrConnectDialog(
+    onDismiss: () -> Unit,
+    onConnect: (String) -> Boolean,
+) {
+    val context = LocalContext.current
+    var text by remember { mutableStateOf("") }
+    var feedback by remember { mutableStateOf<String?>(null) }
+
+    // Real in-app camera scanner (zxing-android-embedded CaptureActivity).
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrBlank()) {
+            if (onConnect(contents.trim())) {
+                onDismiss()
+            } else {
+                feedback = "无法解析该二维码内容"
+            }
+        }
+    }
+
+    fun readClipboard() {
+        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = cm?.primaryClip
+        if (clip != null && clip.itemCount > 0) {
+            text = clip.getItemAt(0).coerceToText(context).toString()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("扫码连接") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "点击下方按钮直接调用手机摄像头，扫描电脑端「远程网关」页的二维码即可连接。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Button(
+                    onClick = {
+                        scanner.launch(
+                            ScanOptions()
+                                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt("对准电脑上的二维码")
+                                .setBeepEnabled(false)
+                                .setOrientationLocked(false),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("📷 打开摄像头扫码") }
+                Text(
+                    "或粘贴连接串：",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { readClipboard() }) { Text("从剪贴板读取") }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("连接串") },
+                    placeholder = { Text("dsh-gateway://connect?u=…&t=…") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                feedback?.let {
+                    Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = text.isNotBlank(),
+                onClick = {
+                    if (onConnect(text)) {
+                        onDismiss()
+                    } else {
+                        feedback = "解析失败：请确认是 dsh-gateway://connect 连接串"
+                    }
+                },
+            ) { Text("连接") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+    )
+}
+
+@Composable
 private fun AddServerDialog(
     initialUrl: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, url: String, token: String, allowAnswers: Boolean) -> Unit,
+    onSave: (name: String, url: String, token: String, allowAnswers: Boolean, allowSelfSigned: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf(initialUrl ?: "") }
     var token by remember { mutableStateOf("") }
     var allowAnswers by remember { mutableStateOf(false) }
+    var allowSelfSigned by remember { mutableStateOf(false) }
+    val https = url.trim().startsWith("https://", ignoreCase = true)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加服务器") },
@@ -376,12 +517,25 @@ private fun AddServerDialog(
                     }
                     Switch(allowAnswers, { allowAnswers = it })
                 }
+                if (https) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("信任自签名证书", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "网关自动生成 HTTPS 证书时需开启；仅建议在可信家庭网络使用（token 仍会加密传输）",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(allowSelfSigned, { allowSelfSigned = it })
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = url.startsWith("http://") || url.startsWith("https://"),
-                onClick = { onSave(name, url, token, allowAnswers) },
+                onClick = { onSave(name, url, token, allowAnswers, allowSelfSigned) },
             ) { Text("保存并连接") }
         },
         dismissButton = {

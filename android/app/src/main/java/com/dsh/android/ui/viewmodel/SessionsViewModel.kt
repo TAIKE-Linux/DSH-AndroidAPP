@@ -39,21 +39,28 @@ class SessionsViewModel(app: Application) : AndroidViewModel(app) {
 
     val uiState: StateFlow<SessionsUiState> = container.active.flatMapLatest { binding ->
         if (binding == null) flowOf(SessionsUiState())
-        else kotlinx.coroutines.flow.combine(
-            binding.store.sessions,
-            binding.store.hostDescription,
-            binding.store.lastError,
-            binding.connection.state,
-            binding.connection.downReason,
-        ) { sessions, host, error, conn, reason ->
-            SessionsUiState(
-                sessions = sessions,
-                host = host,
-                serverName = binding.config.name,
-                error = error,
-                connectionState = conn,
-                downReason = reason,
-            )
+        else {
+            // Combine supports 5 typed flows; fold the archive filter in first.
+            val visibleSessions = kotlinx.coroutines.flow.combine(
+                binding.store.sessions,
+                binding.store.archivedSessionIds,
+            ) { sessions, archived -> sessions.filterNot { it.sessionId in archived } }
+            kotlinx.coroutines.flow.combine(
+                visibleSessions,
+                binding.store.hostDescription,
+                binding.store.lastError,
+                binding.connection.state,
+                binding.connection.downReason,
+            ) { sessions, host, error, conn, reason ->
+                SessionsUiState(
+                    sessions = sessions,
+                    host = host,
+                    serverName = binding.config.name,
+                    error = error,
+                    connectionState = conn,
+                    downReason = reason,
+                )
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SessionsUiState())
 
@@ -83,5 +90,12 @@ class SessionsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearError() {
         container.active.value?.store?.let { it.lastError.tryEmit(null) }
+    }
+
+    /** Remove one conversation from the list (PC-side durable archive). */
+    fun deleteSession(sessionId: String) {
+        viewModelScope.launch {
+            container.active.value?.store?.archiveSession(sessionId)
+        }
     }
 }

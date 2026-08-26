@@ -44,6 +44,12 @@ fun friendlyDownReason(reason: String?): String? = when {
         reason.contains("401") ->
         "网关 token 校验失败，请检查 Token"
 
+    // Cloudflare tunnel edge statuses: 530 = tunnel not registered/unresolvable
+    // (still starting, or the quick-tunnel URL died and a new one was assigned);
+    // 502 = origin unreachable. Both mean "rescan or wait", never a token issue.
+    reason.contains("530") || reason.contains("502") ->
+        "公网隧道不可用或地址已变化：请稍候重试；若持续，请在电脑面板重新开启「内网穿透」并用新地址重新扫码（或改回局域网地址）"
+
     reason.contains("timeout", ignoreCase = true) ||
         reason.contains("timed out", ignoreCase = true) ->
         "连接超时"

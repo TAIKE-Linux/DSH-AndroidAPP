@@ -25,6 +25,13 @@ data class ServerConfig(
      * Defaults to OFF — those frames are still displayed either way.
      */
     val allowRemoteAnswers: Boolean = false,
+    /**
+     * HTTPS self-signed trust: when true (and [baseUrl] is https://), the
+     * app accepts the gateway's self-signed certificate without CA validation.
+     * Intended for home-LAN HTTPS where the gateway auto-mints its cert; a
+     * bearer token still gates every request. See docs/ARCHITECTURE.md.
+     */
+    val allowSelfSigned: Boolean = false,
 )
 
 /**

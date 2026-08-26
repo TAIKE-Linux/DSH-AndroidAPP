@@ -120,6 +120,9 @@ class SessionStore(
     private val _sessions = MutableStateFlow<List<SessionSummary>>(emptyList())
     val sessions: StateFlow<List<SessionSummary>> = _sessions.asStateFlow()
 
+    /** Conversations the user removed (archived on the PC); hidden from lists. */
+    val archivedSessionIds = MutableStateFlow<Set<String>>(emptySet())
+
     /** Last transient error surfaced to the UI (cleared by the viewmodel). */
     val lastError = MutableStateFlow<String?>(null)
 
@@ -146,6 +149,7 @@ class SessionStore(
                 if (state == ConnectionState.CONNECTED) {
                     refreshHostDescription()
                     refreshSessions()
+                    refreshArchived()
                 }
             }
         }
@@ -166,6 +170,14 @@ class SessionStore(
 
     suspend fun refreshHostDescription() {
         runCatching { api.describe() }.onSuccess { _hostDescription.value = it }
+    }
+
+    /** Seed the hidden-conversation set from workspace.list on (re)connect. */
+    suspend fun refreshArchived() {
+        runCatching { api.workspaceArchived() }.onSuccess { archived ->
+            archivedSessionIds.value = archived
+            _sessions.value = _sessions.value.filterNot { it.sessionId in archived }
+        }.onFailure { noteFailure(it) }
     }
 
     suspend fun refreshSessions() = refreshMutex.withLock {
@@ -251,6 +263,16 @@ class SessionStore(
             .onFailure { noteFailure(it) }
     }
 
+    /** Remove one conversation from the list (durable archive on the PC). */
+    suspend fun archiveSession(sessionId: String) {
+        runCatching { api.archiveSession(sessionId) }.onSuccess {
+            // The host also pushes host/archived-sessions-changed; remove
+            // locally right away for instant feedback.
+            archivedSessionIds.value = archivedSessionIds.value + sessionId
+            _sessions.value = _sessions.value.filterNot { it.sessionId == sessionId }
+        }.onFailure { noteFailure(it) }
+    }
+
     suspend fun answerApproval(pending: PendingApproval, allowed: Boolean) {
         val payload = com.dsh.android.data.protocol.Api.approvalAnswer(
             pending.sessionId, pending.approvalId, allowed,
@@ -304,6 +326,12 @@ class SessionStore(
 
             is HostFrame.AgentError -> {
                 lastError.value = frame.message
+            }
+
+            is HostFrame.ArchivedSessionsChanged -> {
+                archivedSessionIds.value = frame.archivedSessionIds.toSet()
+                val archived = frame.archivedSessionIds.toSet()
+                _sessions.value = _sessions.value.filterNot { it.sessionId in archived }
             }
 
             is HostFrame.Unknown -> Unit

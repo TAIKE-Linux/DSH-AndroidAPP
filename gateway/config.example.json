@@ -8,8 +8,11 @@
   "dshCwd": "",
   "uploadDir": "",
   "uploadLimitMB": 512,
+  "publicBaseUrl": "",
   "tls": {
+    "auto": true,
     "cert": "",
-    "key": ""
+    "key": "",
+    "certDir": "certs"
   }
 }

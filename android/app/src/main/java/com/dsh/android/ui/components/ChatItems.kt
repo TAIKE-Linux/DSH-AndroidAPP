@@ -71,7 +71,7 @@ fun ChatItemView(item: ChatItem) {
 
 @Composable
 private fun UserBubbleView(item: ChatItem.UserBubble) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.End) {
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 320.dp)) {
             Box(
                 Modifier
@@ -96,76 +96,90 @@ private fun UserBubbleView(item: ChatItem.UserBubble) {
 
 @Composable
 private fun AssistantBubbleView(item: ChatItem.AssistantBubble) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-        var reasoningOpen by remember { mutableStateOf(false) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .background(if (item.streaming) Color(0xFF4D6BFE) else MaterialTheme.colorScheme.primary, CircleShape),
-            )
+    var reasoningOpen by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top,
+    ) {
+        // DeepSeek-web style avatar + name header on the left.
+        Box(
+            Modifier
+                .size(28.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
-                "  DeepSeek Harness",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (item.streaming) {
-                StreamingDots(Modifier.padding(start = 8.dp))
-            }
-        }
-        if (item.reasoning.isNotBlank()) {
-            Row(
-                Modifier
-                    .padding(top = 4.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "思考过程",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(end = 4.dp).alpha(0.9f),
-                )
-                Icon(
-                    if (reasoningOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            AnimatedVisibility(reasoningOpen) {
-                Text(
-                    item.reasoning,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                )
-            }
-        }
-        if (item.text.isNotBlank()) {
-            val bubbleModifier = Modifier
-                .padding(top = 4.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-            if (item.streaming) {
-                // Streaming tail: render plain text. Re-parsing markdown on
-                // every delta makes long streams jank; the final
-                // assistant/message re-renders the full markdown once.
-                Text(item.text, modifier = bubbleModifier, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                MarkdownText(item.text, modifier = bubbleModifier)
-            }
-        }
-        item.usage?.let { usage ->
-            Text(
-                "本次调用 ▲${fmtTokens(usage.billedInput)} ▼${fmtTokens(usage.outputTokens)} tokens",
+                "DS",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+        }
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "DeepSeek Harness",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (item.streaming) {
+                    StreamingDots(Modifier.padding(start = 8.dp))
+                }
+            }
+            if (item.reasoning.isNotBlank()) {
+                Row(
+                    Modifier
+                        .padding(top = 4.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "思考过程",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 4.dp).alpha(0.9f),
+                    )
+                    Icon(
+                        if (reasoningOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                AnimatedVisibility(reasoningOpen) {
+                    Text(
+                        item.reasoning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                    )
+                }
+            }
+            if (item.text.isNotBlank()) {
+                val bubbleModifier = Modifier
+                    .padding(top = 4.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                if (item.streaming) {
+                    // Streaming tail: render plain text. Re-parsing markdown on
+                    // every delta makes long streams jank; the final
+                    // assistant/message re-renders the full markdown once.
+                    Text(item.text, modifier = bubbleModifier, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    MarkdownText(item.text, modifier = bubbleModifier)
+                }
+            }
+            item.usage?.let { usage ->
+                Text(
+                    "本次调用 ▲${fmtTokens(usage.billedInput)} ▼${fmtTokens(usage.outputTokens)} tokens",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }
@@ -197,7 +211,7 @@ private fun ToolCardView(item: ChatItem.ToolCard) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
         onClick = { open = !open },
     ) {
@@ -256,7 +270,7 @@ private fun TodoCardView(item: ChatItem.TodoCard) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -293,7 +307,7 @@ private fun TurnMarkerView(item: ChatItem.TurnMarker) {
         "interrupted" -> "第 ${item.turn} 轮 · 中断" to MaterialTheme.colorScheme.error
         else -> "第 ${item.turn} 轮 · ${item.reasonKind}" to MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         HorizontalDivider(Modifier.padding(bottom = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = color)
@@ -316,7 +330,7 @@ private fun NoticeView(item: ChatItem.Notice) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 2.dp),
+            .padding(vertical = 2.dp),
         maxLines = 3,
     )
 }

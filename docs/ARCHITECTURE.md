@@ -37,15 +37,30 @@
 网关就是这层「部署方认证」：DSH 保持官方的 127.0.0.1 安全姿态，网关以**最小暴露面**
 把 `/api` 以 token 认证形式提供给局域网，且**不代理网页 UI 本身**（手机用原生 App，不需要 UI）。
 
+### 网关的两种形态
+
+| 形态 | 启动方式 | 适用 |
+|---|---|---|
+| 独立进程 | `gateway/start.bat` 或 `npm start` | 想单独控制网关/DSH 生命周期 |
+| **DSH bundle 插件** | `dsh plugin add <gateway 目录>` | 希望 `dsh web` 一条命令同时提供远程能力 |
+
+两者共用 `gateway/src/gateway.js` 的同一套鉴权/代理/上传逻辑；区别只在
+「是否托管 `dsh web` 进程」——插件运行在 DSH 进程内，自然不需要 supervisor。
+
+### 远程访问
+
+默认威胁模型是「家庭 WiFi 内」。跨网段遥控走 VPN / Tailscale / 路由器端口转发，
+网关通过 `publicBaseUrl` 在 `/ident` 中公布对外地址，手机扫描即可发现。
+
 ## 信任模型与威胁面
 
 | 层 | 机制 | 说明 |
 |---|---|---|
-| 传输 | 局域网明文 HTTP + Bearer token | DSH 无 TLS；家庭 WiFi 是边界。可选 TLS（见下） |
-| 认证 | 每个 HTTP 请求/WS 升级校验 `Authorization: Bearer <token>` | token 由网关首次运行随机生成（24 字节 base64url） |
+| 传输 | **默认 HTTPS**（自签名证书自动生成）+ Bearer token | 网关 `tls.auto` 自动 mint 自签名证书；手机端开启「信任自签名证书」后 token 加密传输。可回退 HTTP |
+| 认证 | 每个 HTTP 请求/WS 升级校验 `Authorization: Bearer <token>` | token 由网关首次运行随机生成（32 字节 base64url，存于 config / `gateway.token` / `~/.dsh/remote-gateway/`） |
 | 上游围栏 | 网关以 `Host: 127.0.0.1:3080` 回连 | 恰好命中 DSH 官方 loopback 信任围栏，无需改 DSH 配置 |
 | 暴露面 | 只允许 `/api/*`（POST）与两个 WS 路径 + 两个未鉴权静态端点 | 静态 UI、目录列表等一律 404 |
-| 未鉴权端点 | `GET /ident`（静态识别信息）、`GET /health`（仅上游可达性布尔值） | 扫描发现专用；**不含** cwd/模型/任何主机细节（v0.2 收紧） |
+| 未鉴权端点 | `GET /ident`（静态识别信息 + `scheme` + 证书指纹 + `public` 远程地址）、`GET /health`（仅上游可达性布尔值） | 扫描发现专用；**不含** cwd/模型/任何主机细节（v0.2 收紧） |
 | 审批安全 | 手机默认**不能**远程回答审批/提问 | `allowRemoteAnswers` 逐服务器开启；开启即等于把沙箱放行权交给手机 |
 
 ### 已知风险（如实声明）
@@ -56,20 +71,21 @@
 - 手机丢失且开启「允许远程审批」时，捡到者可在 token 有效期内放行沙箱操作。
   缓解：网关重启换 token（删除 `gateway.config.json` 的 token 字段重新生成）、App 侧删除服务器。
 
-### 可选 TLS
+### 默认 HTTPS（自签名自动生成）
 
-网关支持 `tls.cert/tls.key`（`gateway.config.json`）：
+`gateway.config.json` 的 `"tls": { "auto": true }`（推荐默认）会在首次启动时
+**无需 openssl/mkcert**，直接用 Node 生成 2048-bit RSA 自签名证书，写到
+`gateway/certs/`（插件模式为 `~/.dsh/remote-gateway/certs/`），并让网关监听 HTTPS。
 
-```bash
-# 电脑上生成自签名证书（openssl 或 mkcert）
-mkcert -install
-mkcert 192.168.1.10
-# gateway.config.json:
-#   "tls": { "cert": "./_wildcard.pem 路径", "key": "./key 路径" }
-```
+`/ident` 返回证书 SHA-256 指纹（`tlsFingerprint`）与 `scheme`；手机端在「添加服务器」
+时对 `https://` 地址提供「信任自签名证书」开关：
 
-App 填写 `https://…` 地址即可（自签名证书需要在 App 内做信任处理，见 ROADMAP；
-当前版本建议配合 mkcert 的本地 CA 或暂用 HTTP）。
+- **开启**：OkHttp 使用 trust-all `SSLContext` + 任意 hostname verifier，仅对该
+  服务器生效。风险边界已收敛——tls 只保护传输机密性，**认证仍完全由 bearer token
+  承担**（自签名证书无法证明对端身份，但 token 也不再明文暴露）。
+- **关闭**：只信任系统 CA，适合 mkcert/自有 CA 场景。
+
+> 家庭 WiFi 边界之外（公共网络/公网）强烈建议配合 Tailscale/VPN 或真正的 CA 证书。
 
 ## 局域网扫描发现（v0.2）
 
@@ -95,7 +111,7 @@ ui/viewmodel/
   ServersViewModel / SessionsViewModel / ChatViewModel
         │
 data/store/
-  ServerConfigStore(EncryptedSharedPreferences，Keystore AES256-GCM)  ·  SessionStore（帧消费 + 每会话事件日志 + 投影 + 审批/提问）
+  ServerConfigStore(EncryptedSharedPreferences，Keystore AES256-GCM)  ·  SessionStore（帧消费 + 每会话事件日志 + 投影 + 审批/提问）  ·  BackgroundStore（自定义背景，非敏感，SharedPreferences）
         │                                        │
 data/remote/
   DshApiClient（HTTP RPC）  ·  ConnectionManager（mux/host 双 WS，重连+退避）
@@ -113,6 +129,10 @@ data/protocol/   ← DSH 官方 wire 契约的 Kotlin 镜像（信封、SessionE
 - **gap 修复**：断线重连后，`session/subscribed.lastSeq` 大于本地已知最大 seq 时自动补拉 history 尾页。
 - **回答帧**：`approval/requested`/`question/requested` 的 rpcId 原样回填到
   `POST /api/respond` 的 client-response（官方应答契约）。
+- **自签名 HTTPS 信任**：`ServerConfig.allowSelfSigned` 为 true 且地址是 https 时，
+  `AppContainer` 只为该服务器构建 trust-all OkHttp 客户端；其余服务器仍走系统 CA。
+- **自定义背景**：`BackgroundStore` 持久化用户选择的纯色/渐变/相册图片，根级
+  `AppBackground` 绘制背景，三个页面的 Scaffold 声明透明容器让背景透出。
 
 ## 与官方契约的对齐方式
 

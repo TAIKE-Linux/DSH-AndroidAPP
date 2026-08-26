@@ -2,6 +2,8 @@ package com.dsh.android.data.protocol
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.boolean
@@ -116,6 +118,9 @@ sealed interface HostFrame {
     data class SessionStatus(val sessionId: String, val running: Boolean) : HostFrame
 
     data class AgentError(val sessionId: String, val message: String) : HostFrame
+
+    /** Official archive push: sessions in this set are hidden from list surfaces. */
+    data class ArchivedSessionsChanged(val archivedSessionIds: List<String>) : HostFrame
 
     data class Unknown(val payload: JsonElement) : HostFrame
 }
@@ -265,6 +270,15 @@ object Frames {
                 sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: "",
                 message = obj["message"]?.jsonPrimitive?.content ?: "",
             )
+
+            "host/archived-sessions-changed" -> runCatching {
+                HostFrame.ArchivedSessionsChanged(
+                    Wire.json.decodeFromJsonElement(
+                        ListSerializer(String.serializer()),
+                        obj["archivedSessionIds"] ?: JsonNull,
+                    ),
+                )
+            }.getOrElse { HostFrame.Unknown(payload) }
 
             else -> HostFrame.Unknown(payload)
         }

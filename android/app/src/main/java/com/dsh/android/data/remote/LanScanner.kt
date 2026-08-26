@@ -25,12 +25,19 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 data class LanScanResult(
-    /** Gateway base URL, e.g. http://192.168.1.10:8742 */
+    /** Gateway base URL, e.g. https://192.168.1.10:8742 */
     val baseUrl: String,
     val version: String,
     val latencyMs: Long,
+    /** Advertised public/WAN base URL when the gateway is configured for remote access. */
+    val publicUrl: String? = null,
 )
 
 data class LanScanState(
@@ -66,6 +73,10 @@ class LanScanner(context: Context) {
         .callTimeout(900, TimeUnit.MILLISECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
+        // /ident is unauthenticated public discovery info. The gateway serves
+        // HTTPS with a self-signed certificate by default, so the probe accepts
+        // any cert; the real client still validates (or user-opts into trust).
+        .apply { trustAllCertificates(this) }
         .build()
 
     private val _state = MutableStateFlow(LanScanState())
@@ -142,10 +153,19 @@ class LanScanner(context: Context) {
     }
 
     private fun probe(target: String): LanScanResult? {
+        // Probe both schemes: the gateway defaults to HTTPS (self-signed) but
+        // still supports plain HTTP for users who disable TLS.
         val start = System.currentTimeMillis()
+        for (scheme in listOf("https", "http")) {
+            probeOnce("$scheme://$target/ident", start)?.let { return it }
+        }
+        return null
+    }
+
+    private fun probeOnce(url: String, start: Long): LanScanResult? {
         return try {
             val request = Request.Builder()
-                .url("http://$target/ident")
+                .url(url)
                 .header("User-Agent", "dsh-android-scanner/0.1")
                 .get()
                 .build()
@@ -155,15 +175,30 @@ class LanScanner(context: Context) {
                 val obj = runCatching { Wire.json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return null
                 val name = obj["gateway"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
                 if (name != GATEWAY_NAME) return null
+                val scheme = obj["scheme"]?.jsonPrimitive?.contentOrNull ?: "http"
+                val host = url.substringAfter("://").substringBefore("/ident")
                 LanScanResult(
-                    baseUrl = "http://$target",
+                    baseUrl = "$scheme://$host",
                     version = obj["gateway"]?.jsonObject?.get("version")?.jsonPrimitive?.contentOrNull ?: "",
                     latencyMs = System.currentTimeMillis() - start,
+                    publicUrl = obj["public"]?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull,
                 )
             }
         } catch (_: Exception) {
             null // Unreachable hosts are the expected case; never surface probe errors.
         }
+    }
+
+    private fun trustAllCertificates(builder: OkHttpClient.Builder) {
+        val trustAll = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
+        val context = SSLContext.getInstance("TLS")
+        context.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
+        builder.sslSocketFactory(context.socketFactory, trustAll)
+        builder.hostnameVerifier { _, _ -> true }
     }
 
     companion object {

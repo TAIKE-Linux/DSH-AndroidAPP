@@ -16,8 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,9 +30,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,8 +63,10 @@ fun SessionListScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val connState = state.connectionState
+    var pendingDelete by remember { mutableStateOf<SessionSummary?>(null) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -134,7 +142,11 @@ fun SessionListScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(state.sessions, key = { it.sessionId }) { session ->
-                    SessionRow(session, onClick = { onOpenSession(session.sessionId) })
+                    SessionRow(
+                        session = session,
+                        onClick = { onOpenSession(session.sessionId) },
+                        onDelete = { pendingDelete = session },
+                    )
                 }
                 if (state.sessions.isEmpty() && connState == ConnectionState.CONNECTED) {
                     item {
@@ -149,16 +161,38 @@ fun SessionListScreen(
             }
         }
     }
+
+    pendingDelete?.let { session ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("删除对话") },
+            text = {
+                Text(
+                    "确定删除「${session.projections?.title ?: if (session.blank) "新会话" else "未命名会话"}」吗？\n" +
+                        "将从会话列表中移除（电脑端归档，仍可在 DSH 存档中找回）。",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteSession(session.sessionId)
+                    pendingDelete = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+            },
+        )
+    }
 }
 
 @Composable
-fun SessionRow(session: SessionSummary, onClick: () -> Unit) {
+fun SessionRow(session: SessionSummary, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     session.projections?.title ?: if (session.blank) "新会话" else "未命名会话",
@@ -177,6 +211,14 @@ fun SessionRow(session: SessionSummary, onClick: () -> Unit) {
                             modifier = Modifier.padding(start = 4.dp),
                         )
                     }
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "删除对话",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {

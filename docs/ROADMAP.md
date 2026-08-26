@@ -23,8 +23,9 @@
 ## v0.5 — 安全与体验
 
 - ~~token 用 Android Keystore 加密存储（替代 DataStore 明文）~~ ✅ v0.2.1 已落地（EncryptedSharedPreferences + allowBackup=false）
-- **网关 TLS**：App 端支持自签名证书信任（`networkSecurityConfig` + 用户确认指纹）；
-  或改 `https://` 直连 + mkcert CA。
+- ~~网关 TLS + App 自签名证书信任~~ ✅ v0.3.0 已落地：网关 `tls.auto` 自动生成自签名证书；App 逐服务器「信任自签名证书」开关（trust-all 客户端仅限该服务器）
+- ~~网关插件化 + 远程访问~~ ✅ v0.3.0 已落地：网关可 `dsh plugin add` 作为 bundle 插件导入；`publicBaseUrl` + VPN/端口转发
+- ~~自定义背景~~ ✅ v0.3.0 已落地：纯色/渐变/相册图片全局背景
 - 深色模式跟随、大屏/平板布局（Navigation Rail）。
 - 更好的 Markdown 渲染（`mikepenz/multiplatform-markdown-renderer`）与代码高亮、图片附件显示（`session.attachment`）。
 

@@ -143,6 +143,20 @@ class DshApiClient(
         unary("session.rename", Api.sessionRename(sessionId, title))
     }
 
+    /** Remove a conversation from the list (official archive RPC). */
+    suspend fun archiveSession(sessionId: String) {
+        unary("workspace.archiveSession", Api.workspaceArchiveSession(sessionId))
+    }
+
+    /** Ids of archived (hidden) conversations — seeds the list filter on connect. */
+    suspend fun workspaceArchived(): Set<String> {
+        val value = unary("workspace.list", Api.workspaceList())
+        return runCatching {
+            Wire.json.decodeFromJsonElement(WorkspaceListValue.serializer(), value)
+                .archivedSessionIds.toSet()
+        }.getOrDefault(emptySet())
+    }
+
     suspend fun fork(sessionId: String, atSeq: Long? = null): String {
         val value = unary("session.fork", Api.sessionFork(sessionId, atSeq))
         return runCatching { Wire.json.decodeFromJsonElement(CreatedSession.serializer(), value).sessionId }
@@ -214,3 +228,9 @@ private data class SessionListPage(val items: List<SessionSummary> = emptyList()
 
 @kotlinx.serialization.Serializable
 private data class CreatedSession(val sessionId: String)
+
+@kotlinx.serialization.Serializable
+private data class WorkspaceListValue(
+    @kotlinx.serialization.SerialName("archivedSessionIds")
+    val archivedSessionIds: List<String> = emptyList(),
+)
