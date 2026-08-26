@@ -46,7 +46,7 @@
 
 <
   | 手机端（发布任务、查看过程、追踪 Token 消耗） 
-  | <img src="docs/screenshots/phone.png" width="150"> 
+  | <img src="docs/screenshots/phone.png" > 
 
   | PC 网关面板（地址/Token/二维码） | 一键内网穿透 |
   |---|---|
