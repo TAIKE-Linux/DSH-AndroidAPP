@@ -44,8 +44,8 @@
 
 ## 📸 截图
 
-<!
-  发布到 GitHub 时请将截图放入 docs/screenshots/ 并取消注释：
+<
+   
 
   | 服务器列表 | 扫码连接 | 聊天界面 |
   |---|---|---|
@@ -54,7 +54,7 @@
   | PC 网关面板（地址/Token/二维码） | 一键内网穿透 |
   |---|---|
   | <img src="docs/screenshots/server.png" width="320"> | <img src="docs/screenshots/内网穿透.png" width="320"> |
--->
+>
 
 ---
 
