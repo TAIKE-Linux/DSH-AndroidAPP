@@ -45,11 +45,8 @@
 ## 📸 截图
 
 <
-   
-
-  | 服务器列表 | 扫码连接 | 聊天界面 |
-  |---|---|---|
-  | <img src="docs/screenshots/手机端.png" width="220"> 
+  | 手机端（发布任务、查看过程、追踪 Token 消耗） 
+  | <img src="docs/screenshots/phone.png" width="320"> 
 
   | PC 网关面板（地址/Token/二维码） | 一键内网穿透 |
   |---|---|
