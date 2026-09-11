@@ -1,0 +1,34 @@
+# Node
+node_modules/
+.npm-cache/
+
+# Gateway local config (contains the bearer token — never commit)
+gateway/gateway.config.json
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/debug.keystore
+.gradle-home/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Tools (downloaded distributions & scratch)
+tools/gradle-*.zip
+tools/gradle-dist/
+tools/android-sdk/
+tools/*.zip
+tools/repository*.xml
+tools/build-log.txt
+
+# Reference sources
+reference/
+
+# Build artifacts copied to the repo root for convenience
+DSH-Android-*.apk

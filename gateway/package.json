@@ -1,0 +1,51 @@
+{
+  "name": "@dsh-external/dsh-remote-gateway",
+  "version": "0.3.0",
+  "description": "Authenticated HTTPS/HTTP remote gateway that fronts a loopback DeepSeek Harness (dsh web) /api for the DeepSeek Harness Android app — runs standalone OR as a DSH bundle plugin",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./gateway": "./src/gateway.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "dsh-gateway": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "print-token": "node src/index.js --print-token",
+    "rotate-token": "node src/index.js --rotate-token",
+    "build:client": "node scripts/build-client.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "cordis": ">=4.0.0-rc <5"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml",
+    "config.example.json"
+  ],
+  "license": "MIT"
+}

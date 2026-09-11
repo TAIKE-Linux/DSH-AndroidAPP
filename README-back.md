@@ -1,0 +1,299 @@
+<div align="center">
+
+# 🤖 DeepSeek Harness Android
+
+<p align="center">
+  <strong>在手机上遥控电脑上的 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a></strong>
+</p>
+
+<p align="center">
+  发布任务 · 实时查看过程 · 追踪 Token 消耗 · 保留完整开发接口
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=android&logoColor=white" alt="Jetpack Compose">
+  <img src="https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT">
+  <img src="https://img.shields.io/badge/Version-v0.3.0--beta-blue" alt="Version">
+</p>
+
+</div>
+
+---
+
+## 🎯 项目简介
+
+在 Android 手机上远程操控电脑端的 **DeepSeek Harness（DSH）**：
+
+- 📤 **发布任务**到电脑运行
+- 📡 **实时查看**消息流、工具调用、审批请求、后台任务
+- 📊 **追踪 Token 消耗**（输入 / 输出 / 缓存 / 上下文占用）
+- 🔮 **保留完整后续开发接口**
+
+> ⚠️ **官方现状**：`dsh web` 出于安全考虑**仅监听 127.0.0.1 且无认证**（`--host 0.0.0.0` 被 CLI 硬性拒绝）。
+> 
+> ✅ **本方案**：增加 **PC 端认证网关**，让手机通过局域网安全访问 DSH 的 `/api`。
+> Android 端直接实现 DSH 官方 wire 协议（四象限 RPC + 双 WebSocket 下行流），与网页端使用完全相同的契约。
+
+---
+
+## 📑 目录
+
+- [📦 仓库结构](#-仓库结构)
+- [🚀 快速开始](#-快速开始)
+  - [1. 🖥️ 电脑端 — 一条命令启动全部](#1--电脑端--一条命令启动全部)
+  - [2. 📱 手机端](#2--手机端)
+- [✨ 功能清单](#-功能清单)
+- [📚 文档](#-文档)
+- [🔗 参考](#-参考)
+
+---
+
+## 📦 仓库结构
+
+```
+DeepSeek-Harness-Android/
+├── 📁 android/                 # Android 客户端（Kotlin + Jetpack Compose + Material 3）
+│   └── app/src/main/java/com/dsh/android/
+│       ├── 📁 data/protocol/   # DSH 官方 wire 契约的 Kotlin 模型（信封/事件/帧/投影）
+│       ├── 📁 data/remote/     # DshApiClient（HTTP RPC）+ ConnectionManager（双 WS 重连）
+│       ├── 📁 data/store/      # ServerConfigStore + SessionStore（事件折叠、token 投影）
+│       └── 📁 ui/              # Compose 界面（服务器/会话/聊天/工具卡/审批/提问）
+│
+├── 📁 gateway/                 # PC 端远程网关（Node.js + ws，Bearer 认证代理；可独立运行，也可作为 DSH bundle 插件导入 dsh web）
+├── 📁 tools/                   # 开发辅助脚本（Gradle 下载、WS 测试）
+│
+├── 📁 docs/
+│   ├── 📄 ARCHITECTURE.md      # 总体架构与安全模型
+│   ├── 📄 PROTOCOL.md          # DSH /api wire 协议参考（基于官方契约整理）
+│   └── 📄 ROADMAP.md           # 后续开发路线
+│
+└── 📁 reference/               # （可选）官方仓库源码参考
+```
+
+---
+
+## 🚀 快速开始
+
+### 1. 🖥️ 电脑端 — 一条命令启动全部
+
+#### 首次运行
+
+```bash
+cd gateway
+npm install
+```
+
+#### 日常启动
+
+```bash
+# 双击 gateway\start.bat（或 npm start）
+```
+
+> 💡 网关会自动探测并启动 DeepSeek Harness（`dsh web`），崩溃自动重启；
+> `Ctrl+C` 关闭网关时连带关闭 DSH。首次运行会生成随机 Token 并写入
+> `gateway.config.json` 与 `gateway.token`；`npm run print-token` 或
+> `npm run rotate-token` 可查看/重新生成 Token。
+>
+> 🔒 默认 **HTTPS**：`gateway.config.json` 里 `"tls": { "auto": true }` 会自动生成
+> 自签名证书（无需 openssl）。手机端连接 `https://电脑IP:8742` 并开启「信任自签名证书」。
+
+#### 高级配置
+
+| 场景 | 操作 |
+|------|------|
+| 自行管理 DSH | `gateway.config.json` 设 `"launchDsh": false`，或启动加 `--no-launch-dsh` |
+| 手动启动顺序 | 先 `dsh web`，再 `node src/index.js` |
+
+> ⚠️ **Windows PowerShell 5.1 注意**：不支持 `&&`，请分行执行或用 `;` 连接。
+
+#### 网络配置
+
+- 网关默认监听 `0.0.0.0:8742`，仅代理 `/api`（HTTP RPC + 两个 WebSocket 下行流）
+- 默认 HTTPS（自签名证书自动生成）；也可 `"tls": { "auto": false }` 回退 HTTP
+- 所有请求需携带 `Authorization: Bearer <token>`
+- DSH 本体保持 `127.0.0.1` 不动，随时可官方升级
+- 🔥 **防火墙放行 8742 端口**，手机与电脑需处于**同一局域网**
+
+#### 作为 DSH 插件导入（可选）
+
+不想单独跑 `start.bat`？把网关装成 `dsh web` 的 bundle 插件，随 DSH 一起启动：
+
+```bash
+dsh plugin add <本项目 gateway 目录绝对路径>
+```
+
+> 网关插件默认同样监听 `0.0.0.0:8742` 并自动生成 HTTPS 证书；Token 存于
+> `~/.dsh/remote-gateway/gateway.token`。DSH 本身仍保持 loopback 安全姿态。
+>
+> 🔁 **安全增强**：插件模式下 Token 默认**随 `dsh web` 重启自动轮换**（旧 Token 立即作废，
+> 重启后用面板新二维码重新扫码即可）；固定 Token 可配 `"token": "<固定值>"`，
+> 关闭轮换可配 `"token": { "rotateOnRestart": false }`。
+
+#### 远程访问（内网穿透，不在同一网络也能连）
+
+**推荐：内置一键内网穿透**（Cloudflare Quick Tunnel，免费、无需账号/公网服务器）：
+
+```
+dsh web → 设置 → 远程网关 → 点「开启内网穿透」
+  ↓
+约 10–30 秒后得到公网地址 https://xxx.trycloudflare.com
+  ↓
+面板二维码自动切换为公网地址 → 手机在任何网络（含流量）扫码即连
+```
+
+> 手机局域网扫描到的网关也会显示该公网地址，点「远程」即可预填。
+
+其他可选方式：
+
+- **VPN / Tailscale**：手机与电脑加入同一虚拟局域网，网关地址不变；
+- **端口转发**：路由器把 `8742` 映射到公网，并在 `gateway.config.json` 配
+  `"publicBaseUrl": "https://你的公网域名或IP:端口"`，扫描结果会显示该远程地址；
+- 无论哪种方式，token 都是唯一凭据，请只通过 HTTPS 暴露到公网。
+
+---
+
+### 2. 📱 手机端
+
+#### 方式一：Android Studio（推荐）
+
+用 **Android Studio**（Ladybug 或更新版本）打开 `android/` 目录，同步并运行。
+
+#### 方式二：命令行构建
+
+```bash
+cd android
+
+# Windows
+gradlew.bat :app:assembleDebug
+
+# PowerShell
+.\gradlew.bat :app:assembleDebug
+```
+
+> 📦 产物：`android/app/build/outputs/apk/debug/app-debug.apk`
+
+#### 依赖加速
+
+| 问题 | 解决方案 |
+|------|----------|
+| 依赖下载慢 | `android/gradle.properties` 已启用本机代理（默认 v2rayN/Clash 端口 `10808`，按实际修改） |
+| 机器级配置 | 建议写入 `GRADLE_USER_HOME/gradle.properties`，避免提交进仓库 |
+| Gradle 缓存 | 默认使用仓库内 `.gradle-home/`，已预置 AGP/Kotlin 插件，其余依赖经代理补齐 |
+
+#### 首次连接（推荐：扫码）
+
+```
+电脑端：dsh web → 设置 → 远程网关（显示二维码）
+  ↓
+手机端：打开 App → 服务器页 → 点「扫码」
+  ↓
+点「打开摄像头扫码」直接调用手机摄像头对准二维码
+  ↓
+识别成功 → 自动连接 → 直接进入聊天框 ✅
+```
+
+> 备用方式：点右上角 🔍 **自动扫描局域网** 发现网关；或点 + 手动输入
+> `https://电脑IP:8742` 与 Token（`https://` 地址会显示「信任自签名证书」开关）。
+
+> 💡 **手动输入网关地址时自动补全 `http://` 前缀**；网关默认 HTTPS 时请用 `https://` 或直接扫码。
+
+**连接参数：**
+
+| 参数 | 说明 |
+|------|------|
+| 网关地址 | `https://电脑IP:8742`（扫描自动填好；手动可省略前缀） |
+| Token | 网关生成并打印在 `gateway.config.json` / `gateway.token` 中的值 |
+| 允许远程审批/回答 | 默认关闭（安全开关，详见 [ARCHITECTURE.md](docs/ARCHITECTURE.md)） |
+| 信任自签名证书 | 地址为 `https://` 时出现；网关自动生成证书时开启（家庭网络） |
+
+#### 开始使用
+
+连接成功后：
+
+```
+查看电脑上的全部会话
+  → 新建会话
+    → 输入任务发布到电脑运行
+      → 实时看到回复流式输出
+        → 工具调用卡片、任务清单、每轮 Token 增量
+          → 顶部展开 Token 详细统计
+```
+
+---
+
+## ✨ 功能清单
+
+> 当前版本：**v0.3.0-beta**
+
+| 🏷️ 能力 | 📖 说明 | 🔌 协议 |
+|:---------|:--------|:--------|
+| **🔒 HTTPS + 自签名信任** | 网关默认自动生成自签名证书走 HTTPS；App 支持 `https://` 地址并可逐服务器开启「信任自签名证书」（token 加密传输） | TLS / OkHttp |
+| **🧩 网关插件化** | 网关既可独立 `npm start`，也可 `dsh plugin add` 作为 bundle 插件随 `dsh web` 一起启动，二选一即可 | cordis bundle |
+| **🌍 远程访问（内网穿透）** | 面板一键开启 Cloudflare 免费隧道，公网地址 + 二维码自动切换，手机任意网络（含流量）可连；也支持 VPN/Tailscale/端口转发 + `publicBaseUrl` | cloudflared + `/ident` |
+| **📱 扫码配对（内置摄像头·竖屏）** | PC 插件面板用校验过的库生成二维码（`dsh-gateway://connect` 深链）；手机「扫码」**直接调用摄像头（竖屏）识别**，也可用系统相机/粘贴连接串 | ZXing + 深链 + App 内解析 |
+| **🎯 连接即进聊天** | 连接成功后自动打开最近会话（无则新建），直接进入聊天框 | `session.list` / `session.create` |
+| **💬 聊天 UI（DeepSeek 网页布局）** | 居中消息列（平板限宽、手机全宽）、左侧模型头像+名称、右侧用户气泡、底部圆角输入条；Token 与上下文双行布局不再挤压换行 | — |
+| **🔍 局域网扫描发现** | 一键扫描 /24 网段 × 端口 8742/8743/8744（HTTP+HTTPS），经 `/ident` 精确识别；扫到的地址直接展示，**已保存过 Token 的网关点「连接」一步直连** | `GET /ident` |
+| **📤 发布任务** | 新建会话 + `session.prompt(mode=queue)` | `session.create` / `session.prompt` |
+| **📡 实时过程** | 流式 assistant 文本/思考过程、工具调用+结果卡、todo 清单、每轮状态（完成/出错/停止）、后台任务条 | WS `/api/events.mux` / `events.host` |
+| **📊 Token 消耗** | 会话累计输入/输出/缓存读写（`tokenUsage` 投影）、每轮增量、上下文占用条（`contextPressure`）、构成估算（`contextBreakdown`） | `session/projection` 帧 + `assistant/message.usage` |
+| **🧠 上下文 UI 优化** | 占用条按阈值变色（绿/黄/红）+ 剩余窗口；详情页用堆叠条可视化系统/工具/消息构成 | `contextPressure` / `contextBreakdown` |
+| **🎨 自定义背景** | 服务器页「背景」一键切换预设纯色/渐变或相册图片，全局生效 | — |
+| **🎮 任务控制** | 停止当前轮（`session.cancel`）、模型切换（`session.models`/`selectModel`）、重命名（聊天页 ✏️） | 对应 RPC |
+| **🗑 删除对话** | 会话列表每行 🗑 一键删除（确认后归档到电脑端，列表即时移除；`host/archived-sessions-changed` 推送 + `workspace.list` 冷启动同步） | `workspace.archiveSession` |
+| **✅ 远程审批** | 沙箱操作审批（允许一次/拒绝）、代理提问回答（默认关闭，逐服务器开关） | `approval/requested` → `POST /api/respond` |
+| **🔄 断线恢复** | 双流自动重连 + 指数退避 + 订阅基线 gap 补拉 | 官方 ConnectionController 同款策略 |
+| **⏱️ 传输超时与自愈** | 一元 RPC 60s 硬超时、应答 30s、上传 10min；超时弹出提示并**自动强制重建双流**；运行中 120s 无新消息显示温和提示（长工具调用不误杀） | OkHttp callTimeout |
+| **🎨 交互优化** | 阅读历史智能停滚 + 回到底部、IME 回车发送、圆角一体化输入框（📎/发送内置）、排队/错误/停滞提示 | — |
+| **🔐 Token 静态加密** | 服务器库（含网关 Token）经 Android Keystore（AES256-GCM）加密存储；云备份已关闭 | security-crypto |
+| **⚡ 连接速度优化** | 网关 gzip 压缩 JSON 响应（历史页实测 **-93%**）、WS 压缩协商、Nagle 关闭、keep-alive 30s；App 端 4s 快速失败 + 双流死链即断即重连 | — |
+| **🪶 上下文轻载** | 默认只传输「最近一次提问 + 完整回答」，更早内容按页加载（`beforeSeq` 翻页，位置不跳动） | `session.history` 分页 |
+| **📎 手机传文件到电脑** | 聊天页 📎 选任意文件 → 流式上传（进度条）到**会话工作区 `uploads/`**，自动填入引用文案 | 网关 `PUT /upload` |
+| **💬 聊天流畅度** | 流式阶段纯文本渲染（定稿后一次性渲染 Markdown）、80ms 采样折叠、列表 contentType 复用、发送加载态 | — |
+
+---
+
+## 📚 文档
+
+| 文档 | 内容 |
+|------|------|
+| [📄 ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构设计、安全模型、为什么需要网关 |
+| [📄 PROTOCOL.md](docs/PROTOCOL.md) | DSH `/api` 协议完整参考（本项目实现的依据） |
+| [📄 ROADMAP.md](docs/ROADMAP.md) | 后续开发计划：后台保活通知、Workspace 管理、成本统计、TLS 等 |
+| [📄 gateway/README.md](gateway/README.md) | 网关配置与部署指南 |
+
+---
+
+## 🔗 参考来源
+
+### 官方资源
+
+- 🏠 **官方仓库**：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
+- 📖 **官方文档**：仓库内 `docs/`、各包 `README.md`
+  - `dsh-host-webserver`
+  - `dsh-client-connection`
+  - `dsh-token-meter`
+  - `dsh-host-apiproxy`
+
+### 社区资源
+
+- [awesome-deepseek-harness](https://github.com/0xsline/awesome-deepseek-harness)
+- [deepseek-harness-desktop（Electron 壳）](https://github.com/RZX00/deepseek-harness-desktop)
+
+> 🏆 **目前社区主要是桌面壳，本项目是第一个面向手机远程控制的实现。**
+
+---
+
+## 📄 License
+
+本项目采用 [MIT](LICENSE) 许可证开源。
+
+---
+
+<div align="center">
+
+**📝 该软件目前开发中**
+
+</div>
